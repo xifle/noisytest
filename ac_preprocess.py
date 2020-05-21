@@ -78,7 +78,7 @@ def prepare_fft(x):
 
 
 def prepare_compressed_flat(x):
-    return flatten(mag2log(compress_spectrogram(spectrogram(x), 3)))
+    return flatten(prepare_compressed(x))
 
 
 def prepare_flat(x):
@@ -86,7 +86,16 @@ def prepare_flat(x):
 
 
 def prepare_compressed(x):
-    return mag2log(compress_spectrogram(spectrogram(x), 3))
+    return apply_dct(mag2log(compress_spectrogram(spectrogram(x), 3)))
+
+
+def apply_dct(x):
+    if tf.rank(x) > 2:
+        tmp = tf.transpose(x, perm=[0, 2, 1])
+    else:
+        tmp = tf.transpose(x, perm=[1, 0])
+
+    return tf.signal.dct(tmp, type=2, n=tf.shape(tmp)[-1], norm='ortho')
 
 
 def prepare_compressed_2d(x):

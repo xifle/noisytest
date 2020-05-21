@@ -14,8 +14,8 @@ def calc_error_per_class(y, y_val):
 
     for (pred, exp) in zip(y, y_val.numpy()):
         if pred != exp:
-            false_positives[int(pred+0.1)] += 1.0
-            false_negatives[int(exp+0.1)] += 1.0
+            false_positives[int(pred + 0.1)] += 1.0
+            false_negatives[int(exp + 0.1)] += 1.0
 
     false_positives = false_positives / len(y)
     false_negatives = false_negatives / len(y)
@@ -30,17 +30,19 @@ def train(x_raw, y, x_raw_val, y_val):
                   class_weight={0: weights[0], 1: weights[1], 2: weights[2], 3: weights[3]})
 
     x = prepare_compressed_flat(x_raw)
+    x_val = prepare_compressed_flat(x_raw_val)
+
     normalizer = MeanSubtraction()
     normalizer.learn(x, True)
-    x = normalizer.center_data(x)
-    x_val = normalizer.center_data(prepare_compressed_flat(x_raw_val))
+    # x = normalizer.center_data(x)
+    # x_val = normalizer.center_data(x_val)
 
     mdl.fit(x, y)
 
-    accuracy = mdl.score(x, y), mdl.score(x_val, y_val)
+    accuracy_ = mdl.score(x, y), mdl.score(x_val, y_val)
     error_per_class = calc_error_per_class(mdl.predict(x_val), y_val)
 
-    return accuracy, error_per_class, mdl, normalizer
+    return accuracy_, error_per_class, mdl, normalizer
 
 
 def load_data():
@@ -61,10 +63,10 @@ def train_dry_run():
 def train_and_store_model():
     model, normalizer, accuracy = train_dry_run()
 
-    noisytest_model={
-        "svm" : model,
-        "normalizer" : normalizer,
-        "accuracy" : accuracy
+    noisytest_model = {
+        "svm": model,
+        "normalizer": normalizer,
+        "accuracy": accuracy
     }
     dump(noisytest_model, 'noisytest.model')
 
@@ -81,17 +83,15 @@ def find_parameter(t, v, parameter_array, default_value, set_parameter_function)
 
     if np.size(indices_best) == np.size(accuracy_result):
         # indefinite result
-        print('info: Indifferent parameter. Using default.')
         best_value = default_value
     else:
-        print('info: Multiple values are optimal.')
         # use mean value
         if np.issubdtype(type(parameter_array[0]), np.integer):
-            print('info: Choosing a sample in the mid of all optimal values')
+            # print('info: Choosing a sample in the mid of all optimal values')
             mid = int(np.size(indices_best) / 2)
             best_value = parameter_array[indices_best[mid]]
         else:
-            print('info: Using mean value')
+            # print('info: Using mean value')
             best_value = np.mean(parameter_array[indices_best])
 
     set_parameter_function(best_value)
@@ -152,10 +152,10 @@ def parameter_grid_search():
             for stride in np.arange(224, ac_config.fftSampleLength + 1, 10, np.int32):
                 set_fft_stride_length(stride)
 
-                print('c:', c, 'stride:', stride)
+                # print('c:', c, 'stride:', stride)
                 gamma, accuracy = find_parameter(t, v, np.arange(4.5e-04, 6.0e-04, 1.0e-05),
-                                                       ac_config.rbfKernelGamma,
-                                                       set_kernel_gamma)
+                                                 ac_config.rbfKernelGamma,
+                                                 set_kernel_gamma)
                 if accuracy > bestaccuracy:
                     bestaccuracy = accuracy
                     besthatc = c
@@ -169,9 +169,9 @@ def parameter_grid_search():
 
         else:
             stride_fft, accuracy = find_parameter(t, v,
-                                                             np.arange(224, ac_config.fftSampleLength + 1, 3, np.int32),
-                                                             ac_config.fftStrideLength,
-                                                             set_fft_stride_length)
+                                                  np.arange(224, ac_config.fftSampleLength + 1, 3, np.int32),
+                                                  ac_config.fftStrideLength,
+                                                  set_fft_stride_length)
 
             if accuracy > bestaccuracy:
                 bestaccuracy = accuracy
@@ -185,6 +185,6 @@ def parameter_grid_search():
 
 #parameter_grid_search()
 
-#parameter_search(3)
-#train_dry_run()
-train_and_store_model()
+# parameter_search(3)
+model, normalizer, accuracy = train_dry_run()
+# train_and_store_model()

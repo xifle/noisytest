@@ -12,13 +12,13 @@ inputDataSampleRate = 10000
 fftSampleLength = 1024
 
 # SVM kernel [linear, rbf]
-svmKernel = 'linear'
+svmKernel = 'rbf'
 
 # The regularization parameter for the SVM (hyperparameter)
-svmRegularization = 1.0
+svmRegularization = 1.1
 
 # FFT preprocessing stride length (hyperparameter)
-fftStrideLength = 234
+fftStrideLength = 834
 
 # RBF kernel parameter (hyperparameter)
-rbfKernelGamma = 0.000455
+rbfKernelGamma = 0.00057

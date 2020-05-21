@@ -6,10 +6,6 @@ from ac_import import *
 from ac_preprocess import *
 
 
-def center_data(x):
-    return mean_subtract.center_data(x)
-
-
 def plot_time_data(x):
     plt.plot(np.linspace(0, ac_config.samplesPerFrame/ac_config.inputDataSampleRate, ac_config.samplesPerFrame), x)
     plt.xlabel("Time [s]")
@@ -18,32 +14,47 @@ def plot_time_data(x):
 
 
 def plot_spectrogram(x):
-    plt.imshow(tf.transpose(x), aspect='auto')
-    plt.xlabel('Time [$\\frac{s_{fft}^*}{f_s}$]')
-    plt.ylabel('Frequency [$\\frac{f_s}{n_{fft}}$]')
+    print("shape: ", tf.shape(x))
+    plt.imshow(tf.transpose(x), aspect='auto', interpolation='nearest')
+    #plt.colorbar()
+    plt.xlabel('Time [$\\frac{s_{\\mathrm{fft}}^*}{f_s}$]')
+    plt.ylabel('Frequency [$\\frac{f_s}{n_{\\mathrm{fft}}}$]')
 
 
-mean_subtract = MeanSubtraction()
+def plot_dctresult(x):
+    print("shape: ", tf.shape(x))
+    fig, ax = plt.subplots(1,1)
+    plt.imshow(x, aspect='auto', interpolation='nearest')
+    #plt.colorbar()
+    ax.set_xticks([0.0, 1.0, 2.0, 3.0])
+    ax.set_xticklabels(['0', '1', '2', '3'])
+    plt.xlabel('DCT coefficients temporal continuation')
+    plt.ylabel("Frequency [$\\frac{f_s}{n_{\\mathrm{fft}}}$]")
+
+
 (input, output) = read_training_data(True, False)
-specs = prepare_compressed(input)
-mean_subtract.learn(specs, True)
 
 (data_impact, label_impact, u, v) = read_experiment('training/jointdecalibration', True, True)
+(data_normal, label_normal, u, v) = read_experiment('training/sequence', True, True)
 
-idx = 2
+idx = 4
 
 plot_time_data(data_impact[idx])
+plt.savefig('export/time_data.pgf')
 tikzplotlib.save('export/time_data.tex')
 plt.show()
 
 plot_spectrogram(mag2log(spectrogram(data_impact[idx])))
+plt.savefig('export/spectrogram.pgf')
 tikzplotlib.save('export/spectrogram.tex')
 plt.show()
 
 plot_spectrogram(mag2log(compress_spectrogram(spectrogram(data_impact[idx]), 3)))
+plt.savefig('export/spectrogram_compressed.pgf')
 tikzplotlib.save('export/spectrogram_compressed.tex')
 plt.show()
 
-plot_spectrogram(mean_subtract.center_data(prepare_compressed(data_impact[idx])))
+plot_dctresult(apply_dct(mag2log(compress_spectrogram(spectrogram(data_impact[idx]), 3))))
+plt.savefig('export/final.pgf')
 tikzplotlib.save('export/final.tex')
 plt.show()
