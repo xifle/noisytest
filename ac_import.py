@@ -79,7 +79,7 @@ def read_experiment(experiment_name, binary_labels, sparse_labels, always_full_f
     expected result tensors as tuple (signals, results) for the given filename.
     Applies framing where possible to generate more data frames'''
 
-    reader = noisytest.ExperimentReader(noisytest.PreprocessorParameters())
+    reader = noisytest.ExperimentReader(noisytest.Preprocessor())
 
     reader.do_pad_data = not always_full_frame
     exp = reader.read('data', experiment_name)
