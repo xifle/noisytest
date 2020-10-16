@@ -1,0 +1,50 @@
+import os
+from dataclasses import dataclass
+from typing import Any
+import csv
+
+import numpy as np
+
+
+@dataclass
+class Noise:
+    time: Any
+    noise_estimate: Any
+
+
+class NoiseReader:
+    """Reads in column-based data format with time and noise estimate"""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def __init__(self, filename: str):
+        """Construct a noise data reader from given filename
+
+        The file extension is automatically appended if none is supplied
+        """
+        if not filename.endswith('.log'):
+            filename = filename + '.log'
+
+        self._file_handle = open(filename, newline='')
+        self._raw_reader = csv.reader(self._file_handle, delimiter=' ')
+        self.__read_header()
+
+        self._data = np.array(list(self._raw_reader), np.float32)
+
+    def __read_header(self):
+        # skip all header lines
+        while str(next(self._raw_reader)[0]).lstrip().startswith('#'):
+            pass
+
+    def data(self):
+        """Returns simulation time and noise estimate arrays"""
+        return Noise(self._data[:, 0], self._data[:, 1])
+
+    @property
+    def sample_time(self):
+        """Returns the sample time in seconds"""
+        return np.mean(np.diff(self._data[:, 0]))
