@@ -1,38 +1,23 @@
 from dataclasses import dataclass
 from typing import Any
+import logging
+import os
 
-import ac_config
 import noisytest.noise_reader
 import noisytest.meta_data_reader
-import os
 import tensorflow as tf
-import numpy as np
-import logging
 
 
 @dataclass
 class Experiment:
     input: Any
     target: Any
-    no_of_samples: int
+    no_of_time_samples: int
     no_of_annotated_blocks: int
 
 
-label_map = {
-    'ok': 0,
-    'impact': 1,
-    'highaccelerations': 2,
-    'oscillations': 3
-}
-num_categories = max(label_map.values()) + 1
-
-
-def convert_labels_to_categorical_result_tensor_sparse(labels, expected_size):
-    result = float(label_map[labels[0]])
-    return tf.fill([expected_size], result)
-
-
 class ExperimentReader:
+    """Reads in experiment (training or validation) data"""
 
     def __init__(self, preprocessor):
         self._preprocessor = preprocessor
@@ -40,6 +25,10 @@ class ExperimentReader:
 
     @property
     def do_pad_data(self):
+        """Pad the data block when it is smaller than the frame size?
+
+         If false, the data block will be enlarged instead.
+         Should be false on validation data"""
         return self._do_pad_data
 
     @do_pad_data.setter
@@ -47,6 +36,8 @@ class ExperimentReader:
         self._do_pad_data = value
 
     def read(self, data_path: str, experiment_name: str) -> Experiment:
+        """Reads in an experiment consisting of noise data and labels"""
+
         full_filename = os.path.join(data_path, experiment_name)
 
         with noisytest.NoiseReader(full_filename) as noise_reader:
@@ -60,33 +51,22 @@ class ExperimentReader:
         input_samples = self._preprocessor.create_empty_input_sample()
         target_samples = self._preprocessor.create_empty_target_sample()
 
-        total_number_of_samples = 0
+        number_of_time_samples = 0
 
-        for block_range, labels in zip(meta_data.block_ranges, meta_data.block_labels):
+        for block_range, label in zip(meta_data.block_ranges, meta_data.block_labels):
             (start_time, end_time) = self.__start_end_time(full_filename, noise_data.time, block_range)
 
             logging.info("Processing chunk from t=", start_time, "to t=", end_time)
+            block_data = self._preprocessor.pad_if_necessary(noise_data.noise_estimate[(noise_data.time >= start_time)
+                                                                                       & (noise_data.time <= end_time)])
+            number_of_time_samples += block_data.size
 
-            block_data = noise_data.noise_estimate[(noise_data.time >= start_time) & (noise_data.time <= end_time)]
-            if block_data.size < ac_config.samplesPerFrame:
-                block_data = np.pad(block_data, (0, ac_config.samplesPerFrame - block_data.size), mode='reflect',
-                                    reflect_type='odd')
+            input_frames, target_frames = self._preprocessor.frame_training_data(block_data, label)
 
-            total_number_of_samples += block_data.size
+            input_samples = tf.concat([input_samples, input_frames], 0)
+            target_samples = tf.concat([target_samples, target_frames], 0)
 
-            # determine stride
-            stride = ac_config.timeFrameStride
-            if meta_data.stride == -1:
-                stride = ac_config.samplesPerFrame
-
-            input_data = tf.signal.frame(block_data, ac_config.samplesPerFrame, stride)
-
-            label_data = convert_labels_to_categorical_result_tensor_sparse(labels, tf.shape(input_data)[0])
-
-            input_samples = tf.concat([input_samples, input_data], 0)
-            target_samples = tf.concat([target_samples, label_data], 0)
-
-        return Experiment(input_samples, target_samples, total_number_of_samples, len(meta_data.block_ranges))
+        return Experiment(input_samples, target_samples, number_of_time_samples, len(meta_data.block_ranges))
 
     def __start_end_time(self, filename, time_data, block_range):
         """Determine start and end time of a data block. Returns a tuple (start, end) in seconds"""

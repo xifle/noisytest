@@ -22,3 +22,5 @@ fftStrideLength = 834
 
 # RBF kernel parameter (hyperparameter)
 rbfKernelGamma = 0.00057
+
+num_categories=4

@@ -11,8 +11,8 @@ from noisytest import experiment_reader
 
 
 def calc_error_per_class(y, y_val):
-    false_positives = np.zeros(experiment_reader.num_categories)
-    false_negatives = np.zeros(experiment_reader.num_categories)
+    false_positives = np.zeros(ac_config.num_categories)
+    false_negatives = np.zeros(ac_config.num_categories)
 
     for (pred, exp) in zip(y, y_val.numpy()):
         if pred != exp:
