@@ -6,3 +6,6 @@ from .dataset_reader import *
 from .model import *
 from .optimizer import *
 from .tunable import *
+from .ui import *
+
+__version__ = "0.0.1"

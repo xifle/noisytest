@@ -49,6 +49,21 @@ class Preprocessor(ABC, noisytest.tunable.HyperParameterMixin):
         return self._parent.keywords_to_target_data
 
     @property
+    def target_data_to_keywords(self):
+        """Maps target data to training data keywords"""
+        return dict((v, k) for k, v in self.keywords_to_target_data.items())
+
+    def append_parent(self, new_parent):
+        """Add a parent to the preprocessor chain"""
+        obj = self
+        while True:
+            if obj.parent is None:
+                obj.parent = new_parent
+                return self
+
+            obj = obj.parent
+
+    @property
     def parent(self):
         return self._parent
 

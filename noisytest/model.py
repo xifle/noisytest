@@ -21,7 +21,8 @@ class ModelError:
 
 class Model(noisytest.tunable.HyperParameterMixin):
 
-    def __init__(self, preprocessor, regularization=1.1, kernel='rbf', kernel_gamma=0.00057):
+    def __init__(self, input_preprocessor, preprocessor, regularization=1.1, kernel='rbf', kernel_gamma=0.00057):
+        self._input_preprocessor = input_preprocessor  # additional preprocessor for reading in prediction data
         self._preprocessor = preprocessor
         self._svm = svm.SVC(C=regularization, kernel=kernel, gamma=kernel_gamma)
 
@@ -43,6 +44,13 @@ class Model(noisytest.tunable.HyperParameterMixin):
         false_neg, false_pos = self.__calc_error_per_class(self._svm.predict(processed.input), processed.target)
 
         return ModelError(subset_accuracy, false_neg, false_pos)
+
+    def predict(self, noise_data):
+
+        time_frames = self._input_preprocessor.prepare_data(noise_data.time)
+        noise_frames = self._preprocessor.append_parent(self._input_preprocessor).prepare_data(noise_data.noise_estimate)
+
+        return time_frames.numpy(), self._svm.predict(noise_frames)
 
     @staticmethod
     def __calc_error_per_class(predicted, truth):
@@ -67,6 +75,10 @@ class Model(noisytest.tunable.HyperParameterMixin):
     @property
     def preprocessor(self):
         return self._preprocessor
+
+    @property
+    def input_preprocessor(self):
+        return self._input_preprocessor
 
     @property
     def kernel(self):
