@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
+import noisytest.tunable
 
 import tensorflow as tf
 import numpy as np
@@ -12,8 +13,13 @@ class ModelError:
     class_false_negatives: Any
     class_false_positives: Any
 
+    @property
+    def fitness(self):
+        """Fitness value for hyper parameter search"""
+        return self.subset_accuracy
 
-class NoisyModel:
+
+class Model(noisytest.tunable.HyperParameterMixin):
 
     def __init__(self, preprocessor, regularization=1.1, kernel='rbf', kernel_gamma=0.00057):
         self._preprocessor = preprocessor
@@ -61,3 +67,32 @@ class NoisyModel:
     @property
     def preprocessor(self):
         return self._preprocessor
+
+    @property
+    def kernel(self):
+        return self._svm.kernel
+
+    @property
+    def regularization(self):
+        return self._svm.C
+
+    @regularization.setter
+    def regularization(self, value):
+        self._svm.C = value
+
+    @property
+    def kernel_parameter(self):
+        return self._svm.gamma
+
+    @kernel_parameter.setter
+    def kernel_parameter(self, value):
+        self._svm.gamma = value
+
+    @property
+    def hyper_parameters(self):
+        base = {'regularization': noisytest.tunable.HyperParameterRange(0.5, 0.1, 2.5)}
+
+        if self.kernel == 'rbf':
+            base['kernel_parameter'] = noisytest.tunable.HyperParameterRange(4.5e-04, 1.0e-05, 6.0e-04)
+
+        return base

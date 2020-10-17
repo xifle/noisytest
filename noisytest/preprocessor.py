@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 import tensorflow as tf
 import numpy as np
+import noisytest.tunable
 
 
 @dataclass
@@ -14,21 +15,22 @@ class InputTargetData:
     no_of_annotated_blocks: int
 
 
-class Preprocessor:
+class Preprocessor(ABC, noisytest.tunable.HyperParameterMixin):
     """Preprocessor for noise / target data"""
 
     def __init__(self, parent):
         self._parent = parent
 
     def prepare_data(self, data):
-        if self._parent is not None:
-            data = self._parent.prepare_data(data)
-        return data
+        if self._parent is None:
+            return data
+
+        return self._parent.prepare_data(data)
 
     def prepare_input_target_data(self, data):
-        if self._parent is not None:
-            data = self._parent.prepare_input_target_data(data)
-        return data
+        if self._parent is None:
+            return data
+        return self._parent.prepare_input_target_data(data)
 
     @staticmethod
     def concat_input_target_data(a, b):
@@ -40,6 +42,13 @@ class Preprocessor:
         )
 
     @property
+    def keywords_to_target_data(self):
+        """Maps training data keywords to target data"""
+        if self._parent is None:
+            return None
+        return self._parent.keywords_to_target_data
+
+    @property
     def parent(self):
         return self._parent
 
@@ -48,18 +57,18 @@ class Preprocessor:
         self._parent = parent
 
 
-class InputOnlyPreprocessor(ABC, Preprocessor):
+class InputOnlyPreprocessor(Preprocessor):
     """Preprocessor for noise data"""
 
     def prepare_data(self, data):
-        data = super().prepare_data(data)
-        data = self.process(data)
-        return data
+        result = super().prepare_data(data)
+        result = self.process(result)
+        return result
 
     def prepare_input_target_data(self, data):
-        data = super().prepare_input_target_data(data)
-        data.input = self.process(data.input)
-        return data
+        result = super().prepare_input_target_data(data)
+        result.input = self.process(result.input)
+        return result
 
     @abstractmethod
     def process(self, data):
@@ -68,8 +77,8 @@ class InputOnlyPreprocessor(ABC, Preprocessor):
 
 class TimeDataFramer(Preprocessor):
 
-    def __init__(self, parent, keywords_to_target_data):
-        super().__init__(parent)
+    def __init__(self, keywords_to_target_data):
+        super().__init__(None)
         self._keywords_to_target_data = keywords_to_target_data
         self._samples_per_frame = 4000
         self._time_frame_stride = 1000
@@ -82,19 +91,20 @@ class TimeDataFramer(Preprocessor):
             0, 0)
 
     def prepare_data(self, data):
-        data = super().prepare_data(data)
-        data = self.__frame_data(data)
-        return data
+        result = super().prepare_data(data)
+        result = self.__frame_data(result)
+        return result
 
     def prepare_input_target_data(self, data):
-        data = super().prepare_input_target_data(data)
-        data = self.__pad_if_necessary(data)
+        result = super().prepare_input_target_data(data)
+        result = self.__pad_if_necessary(result)
 
-        data.input = self.__frame_data(data.input)
-        target_value = float(self.keywords_to_target_data[data.target])
-        data.target = tf.fill([tf.shape(data.input)[0]], target_value)
+        assert self.keywords_to_target_data, "LabelData must be given as parent"
+        result.input = self.__frame_data(result.input)
+        target_value = float(self.keywords_to_target_data[result.target])
+        result.target = tf.fill([tf.shape(result.input)[0]], target_value)
 
-        return data
+        return result
 
     def __pad_if_necessary(self, data):
         if data.input.size < self.samples_per_frame:
@@ -111,29 +121,48 @@ class TimeDataFramer(Preprocessor):
         """The number of time samples per frame"""
         return self._samples_per_frame
 
+    @samples_per_frame.setter
+    def samples_per_frame(self, value):
+        """The number of time samples per frame"""
+        self._samples_per_frame = value
+
     @property
     def time_frame_stride(self):
         """The stride for generating time-sample frames from original data"""
         return self._time_frame_stride
+
+    @time_frame_stride.setter
+    def time_frame_stride(self, value):
+        """The stride for generating time-sample frames from original data"""
+        self._time_frame_stride = value
 
     @property
     def input_data_sample_rate(self):
         """The sample rate of the input data in Hz"""
         return self._input_data_sample_rate
 
+    @input_data_sample_rate.setter
+    def input_data_sample_rate(self, value):
+        """The sample rate of the input data in Hz"""
+        self._input_data_sample_rate = value
+
     @property
     def frame_duration(self):
         """Frame duration in seconds"""
         return self.samples_per_frame / self.input_data_sample_rate
+
+    def is_matching_sample_time(self, sample_time):
+        assert (sample_time > 0)
+        return abs(1.0 / sample_time - self.input_data_sample_rate) < self.input_data_sample_rate / 10.0
 
     @property
     def keywords_to_target_data(self):
         """Maps training data keywords to target data"""
         return self._keywords_to_target_data
 
-    def is_matching_sample_time(self, sample_time):
-        assert (sample_time > 0)
-        return abs(1.0 / sample_time - self.input_data_sample_rate) < self.input_data_sample_rate / 10.0
+    @property
+    def hyper_parameters(self):
+        return {}
 
 
 class Spectrogram(InputOnlyPreprocessor):
@@ -151,10 +180,22 @@ class Spectrogram(InputOnlyPreprocessor):
         """FFT length in samples"""
         return self._fft_sample_length
 
+    @fft_sample_length.setter
+    def fft_sample_length(self, value):
+        self._fft_sample_length = value
+
     @property
     def fft_stride_length(self):
         """FFT stride length (hyperparameter)"""
         return self._fft_stride_length
+
+    @fft_stride_length.setter
+    def fft_stride_length(self, value):
+        self._fft_stride_length = value
+
+    @property
+    def hyper_parameters(self):
+        return {'fft_stride_length': noisytest.tunable.HyperParameterRange(224, 10, self.fft_sample_length + 1)}
 
 
 class SpectrogramCompressor(InputOnlyPreprocessor):
@@ -185,11 +226,24 @@ class SpectrogramCompressor(InputOnlyPreprocessor):
         """Compression factor"""
         return self._compression_factor
 
+    @compression_factor.setter
+    def compression_factor(self, value):
+        """Compression factor"""
+        self._compression_factor = value
+
+    @property
+    def hyper_parameters(self):
+        return {}
+
 
 class Mag2Log(InputOnlyPreprocessor):
 
     def process(self, data):
         return tf.math.log(data + 1e-06)
+
+    @property
+    def hyper_parameters(self):
+        return {}
 
 
 class DiscreteCosineTransform(InputOnlyPreprocessor):
@@ -202,8 +256,16 @@ class DiscreteCosineTransform(InputOnlyPreprocessor):
 
         return tf.signal.dct(time_frequency_flipped, type=2, n=tf.shape(time_frequency_flipped)[-1], norm='ortho')
 
+    @property
+    def hyper_parameters(self):
+        return {}
+
 
 class Flatten(InputOnlyPreprocessor):
 
     def process(self, data):
         return tf.reshape(data, [-1, tf.shape(data)[-1] * tf.shape(data)[-2]])
+
+    @property
+    def hyper_parameters(self):
+        return {}
