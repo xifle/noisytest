@@ -25,13 +25,17 @@ class MetaDataReader(MetaData):
 
         The file extension is automatically appended if none is supplied
         """
-        if not filename.endswith('.toml'):
-            filename = filename + '.toml'
+        if not filename.endswith(self.file_extension()):
+            filename = filename + self.file_extension()
 
         self._reader = toml.load(filename)
 
         assert len(self._reader['data']['chunk_ranges']) == len(self._reader['data']['chunk_labels']), \
             "%r: Number of chunk ranges must match the number of chunk labels" % filename
+
+    @staticmethod
+    def file_extension():
+        return ".toml"
 
     def data(self):
         """Return MetaData object"""

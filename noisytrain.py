@@ -3,11 +3,10 @@ from sklearn import svm
 # Helper libraries
 
 from joblib import dump
-from ac_preprocess import *
-from ac_import import *
-from ac_preprocess import MeanSubtraction
-
-from noisytest import experiment_reader
+import tensorflow as tf
+import numpy as np
+import noisytest
+import ac_config
 
 
 def calc_error_per_class(y, y_val):
@@ -24,50 +23,58 @@ def calc_error_per_class(y, y_val):
     return false_negatives, false_positives
 
 
-def train(x_raw, y, x_raw_val, y_val):
+def train(training, validation, preprocessor):
     # Calculate balanced weights
-    weights = float(tf.size(y)) / (np.max(y.numpy()) + 1) / np.bincount((y.numpy() + 0.1).astype(int))
+    weights = float(tf.size(training.target)) / (np.max(training.target.numpy()) + 1) / \
+              np.bincount((training.target.numpy() + 0.1).astype(int))
 
     mdl = svm.SVC(C=ac_config.svmRegularization, kernel=ac_config.svmKernel, gamma=ac_config.rbfKernelGamma,
                   class_weight={0: weights[0], 1: weights[1], 2: weights[2], 3: weights[3]})
 
-    x = prepare_compressed_flat(x_raw)
-    x_val = prepare_compressed_flat(x_raw_val)
+    tdata = preprocessor.prepare_input_target_data(training)
+    vdata = preprocessor.prepare_input_target_data(validation)
 
-    normalizer = MeanSubtraction()
-    normalizer.learn(x, True)
-    # x = normalizer.center_data(x)
-    # x_val = normalizer.center_data(x_val)
+    mdl.fit(tdata.input, tdata.target)
 
-    mdl.fit(x, y)
+    accuracy_ = mdl.score(tdata.input, tdata.target), mdl.score(vdata.input, vdata.target)
+    error_per_class = calc_error_per_class(mdl.predict(vdata.input), vdata.target)
 
-    accuracy_ = mdl.score(x, y), mdl.score(x_val, y_val)
-    error_per_class = calc_error_per_class(mdl.predict(x_val), y_val)
-
-    return accuracy_, error_per_class, mdl, normalizer
+    return accuracy_, error_per_class, mdl
 
 
 def load_data():
-    training_data = read_training_data(False, True)
-    validation_data = read_validation_data(False, True)
+    preprocessor = noisytest.TimeDataFramer(None, {
+        'ok': 0,
+        'impact': 1,
+        'highaccelerations': 2,
+        'oscillations': 3
+    })
+    reader = noisytest.DataSetReader(preprocessor)
+    reader.do_pad_data = True
+
+    training_data = reader.read_data_set('data/training')
+
+    reader.do_pad_data = False
+    validation_data = reader.read_data_set('data/validation')
 
     return training_data, validation_data
 
 
 def train_dry_run():
     t, v = load_data()
-    (acc, err_per_class, mdl, norm) = train(t[0], t[1], v[0], v[1])
+
+    preprocessor = noisytest.Flatten(noisytest.DiscreteCosineTransform(noisytest.Mag2Log(noisytest.SpectrogramCompressor(noisytest.Spectrogram(None)))))
+    (acc, err_per_class, mdl) = train(t, v, preprocessor)
     print('Class weights: ', mdl.class_weight)
     print('Overall Accuracy:', acc, 'Per-Class Error (false negative, false positive):', err_per_class)
-    return mdl, norm, acc
+    return mdl, acc
 
 
 def train_and_store_model():
-    model, normalizer, accuracy = train_dry_run()
+    model, accuracy = train_dry_run()
 
     noisytest_model = {
         "svm": model,
-        "normalizer": normalizer,
         "accuracy": accuracy
     }
     dump(noisytest_model, 'noisytest.model')
@@ -77,7 +84,7 @@ def find_parameter(t, v, parameter_array, default_value, set_parameter_function)
     accuracy_result = []
     for param_value in parameter_array:
         set_parameter_function(param_value)
-        (acc, _, mdl, _) = train(t[0], t[1], v[0], v[1])
+        (acc, _, mdl) = train(t, v)
         accuracy_result.append(acc[1])
 
     highest_accuracy = np.amax(accuracy_result)
@@ -185,8 +192,8 @@ def parameter_grid_search():
                 print(beststride)
 
 
-#parameter_grid_search()
+# parameter_grid_search()
 
 # parameter_search(3)
-model, normalizer, accuracy = train_dry_run()
+model, accuracy = train_dry_run()
 # train_and_store_model()

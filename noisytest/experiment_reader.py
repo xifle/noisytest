@@ -1,19 +1,9 @@
-from dataclasses import dataclass
-from typing import Any
 import logging
 import os
 
 import noisytest.noise_reader
 import noisytest.meta_data_reader
-import tensorflow as tf
-
-
-@dataclass
-class Experiment:
-    input: Any
-    target: Any
-    no_of_time_samples: int
-    no_of_annotated_blocks: int
+import noisytest.preprocessor
 
 
 class ExperimentReader:
@@ -35,7 +25,7 @@ class ExperimentReader:
     def do_pad_data(self, value: bool):
         self._do_pad_data = value
 
-    def read(self, data_path: str, experiment_name: str) -> Experiment:
+    def read_experiment(self, data_path: str, experiment_name: str):
         """Reads in an experiment consisting of noise data and labels"""
 
         full_filename = os.path.join(data_path, experiment_name)
@@ -48,25 +38,22 @@ class ExperimentReader:
         with noisytest.MetaDataReader(full_filename) as meta_reader:
             meta_data = meta_reader.data()
 
-        input_samples = self._preprocessor.create_empty_input_sample()
-        target_samples = self._preprocessor.create_empty_target_sample()
-
-        number_of_time_samples = 0
+        data = self._preprocessor.create_empty_input_target_data()
 
         for block_range, label in zip(meta_data.block_ranges, meta_data.block_labels):
             (start_time, end_time) = self.__start_end_time(full_filename, noise_data.time, block_range)
 
-            logging.info("Processing chunk from t=", start_time, "to t=", end_time)
-            block_data = self._preprocessor.pad_if_necessary(noise_data.noise_estimate[(noise_data.time >= start_time)
-                                                                                       & (noise_data.time <= end_time)])
-            number_of_time_samples += block_data.size
+            logging.info("Processing block from t=", start_time, "to t=", end_time)
+           # block_data = self._preprocessor.pad_if_necessary()
 
-            input_frames, target_frames = self._preprocessor.frame_training_data(block_data, label)
+          #  block_frames = self._preprocessor.frame_input_target_data(block_data, label)
 
-            input_samples = tf.concat([input_samples, input_frames], 0)
-            target_samples = tf.concat([target_samples, target_frames], 0)
+            noise = noise_data.noise_estimate[(noise_data.time >= start_time) & (noise_data.time <= end_time)]
+            inout_data = noisytest.InputTargetData(noise, label, noise.size, 1)
+            processed = self._preprocessor.prepare_input_target_data(inout_data)
+            data = self._preprocessor.concat_input_target_data(data, processed)
 
-        return Experiment(input_samples, target_samples, number_of_time_samples, len(meta_data.block_ranges))
+        return data
 
     def __start_end_time(self, filename, time_data, block_range):
         """Determine start and end time of a data block. Returns a tuple (start, end) in seconds"""

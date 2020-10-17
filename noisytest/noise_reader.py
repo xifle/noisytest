@@ -26,8 +26,8 @@ class NoiseReader:
 
         The file extension is automatically appended if none is supplied
         """
-        if not filename.endswith('.log'):
-            filename = filename + '.log'
+        if not filename.endswith(self.file_extension()):
+            filename = filename + self.file_extension()
 
         self._file_handle = open(filename, newline='')
         self._raw_reader = csv.reader(self._file_handle, delimiter=' ')
@@ -43,6 +43,10 @@ class NoiseReader:
     def data(self):
         """Returns simulation time and noise estimate arrays"""
         return Noise(self._data[:, 0], self._data[:, 1])
+
+    @staticmethod
+    def file_extension():
+        return ".log"
 
     @property
     def sample_time(self):
