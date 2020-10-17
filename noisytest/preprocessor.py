@@ -30,7 +30,8 @@ class Preprocessor:
             data = self._parent.prepare_input_target_data(data)
         return data
 
-    def concat_input_target_data(self, a, b):
+    @staticmethod
+    def concat_input_target_data(a, b):
         return InputTargetData(
             tf.concat([a.input, b.input], 0),
             tf.concat([a.target, b.target], 0),

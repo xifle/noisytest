@@ -44,9 +44,6 @@ class ExperimentReader:
             (start_time, end_time) = self.__start_end_time(full_filename, noise_data.time, block_range)
 
             logging.info("Processing block from t=", start_time, "to t=", end_time)
-           # block_data = self._preprocessor.pad_if_necessary()
-
-          #  block_frames = self._preprocessor.frame_input_target_data(block_data, label)
 
             noise = noise_data.noise_estimate[(noise_data.time >= start_time) & (noise_data.time <= end_time)]
             inout_data = noisytest.InputTargetData(noise, label, noise.size, 1)

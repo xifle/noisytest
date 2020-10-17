@@ -9,35 +9,16 @@ import noisytest
 import ac_config
 
 
-def calc_error_per_class(y, y_val):
-    false_positives = np.zeros(ac_config.num_categories)
-    false_negatives = np.zeros(ac_config.num_categories)
-
-    for (pred, exp) in zip(y, y_val.numpy()):
-        if pred != exp:
-            false_positives[int(pred + 0.1)] += 1.0
-            false_negatives[int(exp + 0.1)] += 1.0
-
-    false_positives = false_positives / len(y)
-    false_negatives = false_negatives / len(y)
-    return false_negatives, false_positives
-
-
 def train(training, validation, preprocessor):
-    # Calculate balanced weights
-    weights = float(tf.size(training.target)) / (np.max(training.target.numpy()) + 1) / \
-              np.bincount((training.target.numpy() + 0.1).astype(int))
 
-    mdl = svm.SVC(C=ac_config.svmRegularization, kernel=ac_config.svmKernel, gamma=ac_config.rbfKernelGamma,
-                  class_weight={0: weights[0], 1: weights[1], 2: weights[2], 3: weights[3]})
+    model = noisytest.NoisyModel(preprocessor)
 
-    tdata = preprocessor.prepare_input_target_data(training)
-    vdata = preprocessor.prepare_input_target_data(validation)
+    acc = model.train(training)
+    result = model.validate(validation)
 
-    mdl.fit(tdata.input, tdata.target)
-
-    accuracy_ = mdl.score(tdata.input, tdata.target), mdl.score(vdata.input, vdata.target)
-    error_per_class = calc_error_per_class(mdl.predict(vdata.input), vdata.target)
+    accuracy_ = acc, result.subset_accuracy
+    error_per_class = result.class_false_negatives, result.class_false_positives
+    mdl = model.svm
 
     return accuracy_, error_per_class, mdl
 
