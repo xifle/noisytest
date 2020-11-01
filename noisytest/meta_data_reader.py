@@ -12,7 +12,8 @@ class MetaData:
     stride: int
 
 
-class MetaDataReader(MetaData):
+class MetaDataReader:
+    """TOML-based reader for training/validation data annotations"""
 
     def __enter__(self):
         return self

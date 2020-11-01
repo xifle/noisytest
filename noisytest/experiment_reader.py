@@ -9,8 +9,11 @@ import noisytest.preprocessor
 class ExperimentReader:
     """Reads in experiment (training or validation) data"""
 
-    def __init__(self, preprocessor):
-        self._preprocessor = preprocessor
+    def __init__(self, import_preprocessor):
+        """Construct from ImportPreprocessor instance. The import_preprocessor is used
+        to generate a tensor from raw training / validation data
+        """
+        self._preprocessor = import_preprocessor
         self._do_pad_data = True
 
     @property
@@ -41,7 +44,7 @@ class ExperimentReader:
         data = self._preprocessor.create_empty_input_target_data()
 
         for block_range, label in zip(meta_data.block_ranges, meta_data.block_labels):
-            (start_time, end_time) = self.__start_end_time(full_filename, noise_data.time, block_range)
+            (start_time, end_time) = self._start_end_time(full_filename, noise_data.time, block_range)
 
             logging.info("Processing block from t=", start_time, "to t=", end_time)
 
@@ -52,7 +55,7 @@ class ExperimentReader:
 
         return data
 
-    def __start_end_time(self, filename, time_data, block_range):
+    def _start_end_time(self, filename, time_data, block_range):
         """Determine start and end time of a data block. Returns a tuple (start, end) in seconds"""
         start_time = block_range[0]
         end_time = block_range[1]

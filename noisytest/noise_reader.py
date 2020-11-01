@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 import csv
 
+from noisytest.preprocessor import NullPreprocessor
 import numpy as np
 
 
@@ -20,28 +21,31 @@ class NoiseReader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, preprocessor=NullPreprocessor()):
         """Construct a noise data reader from given filename
 
         The file extension is automatically appended if none is supplied
         """
+        self._preprocessor = preprocessor
+
         if not filename.endswith(self.file_extension()):
             filename = filename + self.file_extension()
 
         self._file_handle = open(filename, newline='')
         self._raw_reader = csv.reader(self._file_handle, delimiter=' ')
-        self.__read_header()
+        self._read_header()
 
         self._data = np.array(list(self._raw_reader), np.float32)
 
-    def __read_header(self):
+    def _read_header(self):
         # skip all header lines
         while str(next(self._raw_reader)[0]).lstrip().startswith('#'):
             pass
 
     def data(self):
         """Returns simulation time and noise estimate arrays"""
-        return Noise(self._data[:, 0], self._data[:, 1])
+        return Noise(self._preprocessor.prepare_data(self._data[:, 0]),
+                     self._preprocessor.prepare_data(self._data[:, 1]))
 
     @staticmethod
     def file_extension():

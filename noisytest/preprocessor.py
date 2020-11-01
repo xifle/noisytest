@@ -4,22 +4,30 @@ from abc import ABC, abstractmethod
 
 import tensorflow as tf
 import numpy as np
-import noisytest.tunable
+from noisytest.tunable import HyperParameterMixin
+from noisytest.tunable import HyperParameterRange
 
 
 @dataclass
 class InputTargetData:
+    """Holds input/target pairs for training/validation"""
     input: Any
     target: Any
     no_of_time_samples: int
     no_of_annotated_blocks: int
 
 
-class Preprocessor(ABC, noisytest.tunable.HyperParameterMixin):
+class Preprocessor(HyperParameterMixin):
     """Preprocessor for noise / target data"""
 
-    def __init__(self, parent):
+    def __init__(self, parent=None, **kwargs):
         self._parent = parent
+
+        # Pass arguments down the chain
+        if parent is None:
+            self._arguments = kwargs
+        else:
+            self._arguments = parent.arguments
 
     def prepare_data(self, data):
         if self._parent is None:
@@ -64,6 +72,10 @@ class Preprocessor(ABC, noisytest.tunable.HyperParameterMixin):
             obj = obj.parent
 
     @property
+    def arguments(self):
+        return self._arguments
+
+    @property
     def parent(self):
         return self._parent
 
@@ -72,8 +84,27 @@ class Preprocessor(ABC, noisytest.tunable.HyperParameterMixin):
         self._parent = parent
 
 
+class ImportPreprocessor(Preprocessor):
+    """A preprocessor, which may be used for data import"""
+
+    @abstractmethod
+    def create_empty_input_target_data(self):
+        pass
+
+
+class NullPreprocessor(Preprocessor):
+    """A preprocessor doing nothing (passing input data)"""
+
+    def __init__(self):
+        super().__init__(None)
+
+    @property
+    def hyper_parameters(self):
+        return {}
+
+
 class InputOnlyPreprocessor(Preprocessor):
-    """Preprocessor for noise data"""
+    """Preprocessor operating only on the noise data (leaving samples dimensions untouched)"""
 
     def prepare_data(self, data):
         result = super().prepare_data(data)
@@ -90,14 +121,16 @@ class InputOnlyPreprocessor(Preprocessor):
         pass
 
 
-class TimeDataFramer(Preprocessor):
+class TimeDataFramer(ImportPreprocessor):
+    """Import preprocessor for time-data. Implements framing and padding to get equal-length chunks"""
 
-    def __init__(self, keywords_to_target_data):
-        super().__init__(None)
-        self._keywords_to_target_data = keywords_to_target_data
-        self._samples_per_frame = 4000
-        self._time_frame_stride = 1000
-        self._input_data_sample_rate = 10000
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self._keywords_to_target_data = self.arguments.get('keywords_to_target_data', None)
+        self._samples_per_frame = self.arguments.get('samples_per_frame', 4000)
+        self._time_frame_stride = self.arguments.get('time_frame_stride', 1000)
+        self._input_data_sample_rate = self.arguments.get('input_data_sample_rate', 10000)
 
     def create_empty_input_target_data(self):
         return InputTargetData(
@@ -107,28 +140,28 @@ class TimeDataFramer(Preprocessor):
 
     def prepare_data(self, data):
         result = super().prepare_data(data)
-        result = self.__frame_data(result)
+        result = self._frame_data(result)
         return result
 
     def prepare_input_target_data(self, data):
         result = super().prepare_input_target_data(data)
-        result = self.__pad_if_necessary(result)
+        result = self._pad_if_necessary(result)
 
-        assert self.keywords_to_target_data, "LabelData must be given as parent"
-        result.input = self.__frame_data(result.input)
+        assert self.keywords_to_target_data, "LabelData must be available"
+        result.input = self._frame_data(result.input)
         target_value = float(self.keywords_to_target_data[result.target])
         result.target = tf.fill([tf.shape(result.input)[0]], target_value)
 
         return result
 
-    def __pad_if_necessary(self, data):
+    def _pad_if_necessary(self, data):
         if data.input.size < self.samples_per_frame:
             data.input = np.pad(data.input, (0, self.samples_per_frame - data.input.size), mode='reflect',
                                 reflect_type='odd')
             data.no_of_time_samples = data.input.size
         return data
 
-    def __frame_data(self, data):
+    def _frame_data(self, data):
         return tf.signal.frame(data, self.samples_per_frame, self.time_frame_stride)
 
     @property
@@ -181,11 +214,12 @@ class TimeDataFramer(Preprocessor):
 
 
 class Spectrogram(InputOnlyPreprocessor):
+    """Preprocessor to generate a spectrogram from input data using a STFT"""
 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self._fft_sample_length = 1024
-        self._fft_stride_length = 834
+    def __init__(self, parent=None, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._fft_sample_length = self.arguments.get('fft_sample_length', 1024)
+        self._fft_stride_length = self.arguments.get('fft_stride_length', 834)
 
     def process(self, data):
         return tf.abs(tf.signal.stft(data, self.fft_sample_length, self.fft_stride_length))
@@ -210,20 +244,21 @@ class Spectrogram(InputOnlyPreprocessor):
 
     @property
     def hyper_parameters(self):
-        return {'fft_stride_length': noisytest.tunable.HyperParameterRange(224, 10, self.fft_sample_length + 1)}
+        return {'fft_stride_length': HyperParameterRange(224, 10, self.fft_sample_length + 1)}
 
 
 class SpectrogramCompressor(InputOnlyPreprocessor):
+    """Preprocessor to compress a spectrogram along its frequency axis"""
 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self._compression_factor = 3
+    def __init__(self, parent=None, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._compression_factor = self.arguments.get('compression_factor', 3)
 
     def process(self, data):
-        return tf.matmul(data, self.__averaging_tensor(tf.shape(data)[-1], self.compression_factor))
+        return tf.matmul(data, self._averaging_tensor(tf.shape(data)[-1], self.compression_factor))
 
     @staticmethod
-    def __averaging_tensor(original_size, compression_rate):
+    def _averaging_tensor(original_size, compression_rate):
         """A tensor to compress the last dimension of tensor data by compression_rate"""
         if original_size % compression_rate > 0:
             print('originalSize:', original_size, 'compressionRate:', compression_rate)
@@ -252,6 +287,7 @@ class SpectrogramCompressor(InputOnlyPreprocessor):
 
 
 class Mag2Log(InputOnlyPreprocessor):
+    """Preprocessor for conversion to logarithmic representation"""
 
     def process(self, data):
         return tf.math.log(data + 1e-06)
@@ -262,6 +298,7 @@ class Mag2Log(InputOnlyPreprocessor):
 
 
 class DiscreteCosineTransform(InputOnlyPreprocessor):
+    """Preprocessor performing a discrete cosine transform type II"""
 
     def process(self, data):
         if tf.rank(data) > 2:
@@ -277,6 +314,7 @@ class DiscreteCosineTransform(InputOnlyPreprocessor):
 
 
 class Flatten(InputOnlyPreprocessor):
+    """Preprocessor to flatten the last two dimension of an input tensor"""
 
     def process(self, data):
         return tf.reshape(data, [-1, tf.shape(data)[-1] * tf.shape(data)[-2]])

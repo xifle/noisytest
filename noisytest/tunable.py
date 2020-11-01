@@ -5,6 +5,7 @@ from typing import Any
 
 @dataclass
 class HyperParameterRange:
+    """Holds a parameter range. Iterable"""
     start: Any
     step: Any
     stop: Any
@@ -14,6 +15,7 @@ class HyperParameterRange:
 
 
 class HyperParameterRangeIterator:
+    """Iterator for hyper parameter ranges"""
 
     def __init__(self, hyper_parameter_range):
         self._hyper_parameter_range = hyper_parameter_range
@@ -27,9 +29,15 @@ class HyperParameterRangeIterator:
         raise StopIteration
 
 
-class HyperParameterMixin:
+class HyperParameterMixin(ABC):
+    """Mixin for the hyper-parameter interface of the noisytest optimizer
+
+       A class with this mixin can present hyper parameters and their ranges to an
+       optimizer.
+    """
 
     @property
     @abstractmethod
     def hyper_parameters(self):
+        """Returns a dictionary of attribute_name, HyperParameterRange pairs or an empty dictionary"""
         pass
