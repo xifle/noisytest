@@ -43,8 +43,8 @@ class DefaultPipeline(Pipeline):
        Derive from this class to create a new pipeline with different model / preprocessors
     """
 
-    def __init__(self, config_file):
-        params = json.load(config_file)
+    def __init__(self, config_file_handle):
+        params = json.load(config_file_handle)
 
         self._import_preprocessor = self.create_import_preprocessor(**params['import_preprocessor']['arguments'])
         self._feature_preprocessor = self.create_feature_preprocessor(**params['feature_preprocessor']['arguments'])
@@ -53,7 +53,7 @@ class DefaultPipeline(Pipeline):
     def test(self, test_file: str):
         """Run noisytest on given file. Returns time-frame and model output as tuple"""
 
-        imported_data = noisytest.NoiseReader(test_file, self._import_preprocessor).data()
+        imported_data = self.load_data(test_file)
         failure_prediction = self._model.predict(self._feature_preprocessor.prepare_data(imported_data.noise_estimate))
         return imported_data.time.numpy(), failure_prediction
 
@@ -74,6 +74,10 @@ class DefaultPipeline(Pipeline):
 
     def create_model(self, **kwargs):
         return noisytest.Model(**kwargs)
+
+    def load_data(self, filename: str):
+        """Load noise data from given file"""
+        return noisytest.NoiseReader(filename, self._import_preprocessor).data()
 
     def load_training_data(self, training_data_directory, validation_data_directory):
         """Loads data from specified directory using the import preprocessor
