@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Setup a virtual environment for noisytest
+# Setup a virtual environment for development / test
+# of noisytest
 
 python3 -m venv env
 source env/bin/activate
