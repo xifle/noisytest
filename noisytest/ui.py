@@ -16,10 +16,6 @@ def _parse_arguments():
                         help='the noisytest pipeline to use.',
                         default='default.noisy', required=False, metavar='NOISYTEST_PIPELINE')
 
-    parser.add_argument('--noise-file', type=str,
-                        help='a noise estimation file to test',
-                        default='noise.log', required=False, metavar='NOISE_FILE')
-
     parser.add_argument('--config', type=argparse.FileType('rt'),
                         help='noisytest config file name',
                         default='noisytest-config.json', required=False, metavar='NOISYTEST_CONFIG')
@@ -27,11 +23,12 @@ def _parse_arguments():
     parser.add_argument("-v", "--verbosity", action="count",
                         help="console output verbosity")
 
-    parser.set_defaults(func=_test)
+    parser.set_defaults(func=lambda x: parser.print_usage())
 
     subparsers = parser.add_subparsers()
-    train_parser = subparsers.add_parser('train', help='train a model from given data using default parameters',
+    train_parser = subparsers.add_parser('train', help='Train a model from given data using default parameters',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     train_parser.add_argument('--output', '-o', type=argparse.FileType('wb'), help='output pipeline filename',
                               default='default.noisy', required=False, metavar='OUTPUT_FILENAME')
 
@@ -48,13 +45,21 @@ def _parse_arguments():
                               action='store_true', required=False)
     train_parser.set_defaults(func=_train)
 
+    run_parser = subparsers.add_parser('run', help='Run test on specified noise file',
+                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    run_parser.add_argument('noisefile', type=str,
+                            help='a noise estimation file to test',
+                            metavar='NOISE_FILE')
+    run_parser.set_defaults(func=_test)
+
     return parser.parse_args()
 
 
 def _test(args):
     pipeline = pickle.load(args['pipeline'])
 
-    time_frames, failure_prediction = pipeline.test(args['noise_file'])
+    time_frames, failure_prediction = pipeline.test(args['noisefile'])
     for t, label in zip(time_frames, failure_prediction):
         if label > 0:
             logging.warning(f"possible {pipeline.import_preprocessor.target_data_to_keywords[label]}"
