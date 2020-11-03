@@ -15,12 +15,6 @@ class Noise:
 class NoiseReader:
     """Reads in column-based data format with time and noise estimate"""
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
     def __init__(self, filename: str, preprocessor=NullPreprocessor()):
         """Construct a noise data reader from given filename
 
@@ -31,15 +25,15 @@ class NoiseReader:
         if not filename.endswith(self.file_extension()):
             filename = filename + self.file_extension()
 
-        self._file_handle = open(filename, newline='')
-        self._raw_reader = csv.reader(self._file_handle, delimiter=' ')
-        self._read_header()
+        with open(filename, newline='') as file_handle:
+            reader = csv.reader(file_handle, delimiter=' ')
+            self._read_header(reader)
+            self._data = np.array(list(reader), np.float32)
 
-        self._data = np.array(list(self._raw_reader), np.float32)
-
-    def _read_header(self):
+    @staticmethod
+    def _read_header(csv_reader):
         # skip all header lines
-        while str(next(self._raw_reader)[0]).lstrip().startswith('#'):
+        while str(next(csv_reader)[0]).lstrip().startswith('#'):
             pass
 
     def data(self):

@@ -44,6 +44,7 @@ class DefaultPipeline(Pipeline):
     """
 
     def __init__(self, config_file_handle):
+        """Construct pipeline from JSON config file handle"""
         params = json.load(config_file_handle)
 
         self._import_preprocessor = self.create_import_preprocessor(**params['import_preprocessor']['arguments'])
@@ -53,29 +54,37 @@ class DefaultPipeline(Pipeline):
     def test(self, test_file: str):
         """Run noisytest on given file. Returns time-frame and model output as tuple"""
 
-        imported_data = self.load_data(test_file)
+        imported_data = self.load_prediction_data(test_file)
         failure_prediction = self._model.predict(self._feature_preprocessor.prepare_data(imported_data.noise_estimate))
         return imported_data.time.numpy(), failure_prediction
 
     def learn(self, training_data, validation_data):
+        """Run training and validation on this pipeline"""
         self._model.train(self._feature_preprocessor.prepare_input_target_data(training_data))
         return self._model.validate(self._feature_preprocessor.prepare_input_target_data(validation_data))
 
     def optimize(self, training_data, validation_data):
+        """Run hyper-parameter search on this pipeline's parameters"""
         opt = noisytest.Optimizer(training_data, validation_data, self)
         opt.grid_search()
 
     def create_import_preprocessor(self, **kwargs):
+        """Factory method for import preprocessor chain"""
         return noisytest.TimeDataFramer(**kwargs)
 
     def create_feature_preprocessor(self, **kwargs):
+        """Factory method for feature preprocessor chain"""
+
+        # creates the chain of preprocessors used for the default feature processing
+        # execution order is inner first.
         return noisytest.Flatten(noisytest.DiscreteCosineTransform(
             noisytest.Mag2Log(noisytest.SpectrogramCompressor(noisytest.Spectrogram(**kwargs)))))
 
     def create_model(self, **kwargs):
+        """Factory method for noisytest model"""
         return noisytest.Model(**kwargs)
 
-    def load_data(self, filename: str):
+    def load_prediction_data(self, filename: str):
         """Load noise data from given file"""
         return noisytest.NoiseReader(filename, self._import_preprocessor).data()
 
@@ -85,10 +94,10 @@ class DefaultPipeline(Pipeline):
         Returns a tuple (training_data, validation_data)
         """
         reader = noisytest.DataSetReader(self._import_preprocessor)
-        reader.do_pad_data = True
-
         training_data = reader.read_data_set(training_data_directory)
 
+        # Validation data must not be padded to avoid learning the symmetry / properties of padded
+        # data samples. (for real tests there are no padded data frames)
         reader.do_pad_data = False
         validation_data = reader.read_data_set(validation_data_directory)
 

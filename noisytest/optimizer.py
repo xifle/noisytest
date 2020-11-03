@@ -1,4 +1,5 @@
 import copy
+import logging
 
 
 class Optimizer:
@@ -45,29 +46,29 @@ class Optimizer:
                 return
             processor = processor.parent
 
-        assert False, "Internal error"
+        raise RuntimeError("hyper-parameter not found")
 
     def _evaluate(self):
         """Evaluate the fitness of the model for the current settings"""
         error = self._pipeline.learn(copy.deepcopy(self._training_data), copy.deepcopy(self._validation_data))
 
         if error.fitness > self._best_fitness:
-            print("reached new fitness optimum ", error.fitness, "for parameters", self._parameter_values)
+            logging.debug(f"reached new fitness optimum {error.fitness} for parameters {self._parameter_values}")
             self._best_fitness = error.fitness
             self._best_parameter_values = self._parameter_values
 
     def _search_sub_space(self, hyper_parameters):
-        """Recursively search the space of given hyper_parameters with a line search"""
+        """Recursively search the space of given hyper parameters with a line search"""
 
         if not hyper_parameters:
             self._evaluate()
             return
 
         sub_space_parameters = copy.copy(hyper_parameters)
-        param = sub_space_parameters.popitem()
+        param_name, param_range = sub_space_parameters.popitem()
 
-        for value in param[1]:
-            self._set_hyper_parameter(param[0], value)
+        for value in param_range:
+            self._set_hyper_parameter(param_name, value)
             self._search_sub_space(sub_space_parameters)
 
     def grid_search(self):
@@ -76,7 +77,7 @@ class Optimizer:
 
         self._search_sub_space(hyper_params)
 
-        print("Best fitness is", self._best_fitness)
-        print("Optimal values are ", self._best_parameter_values)
+        logging.info(f"Best fitness is {self._best_fitness}")
+        logging.info(f"Optimal values are {self._best_parameter_values}")
         for name, value in self._best_parameter_values.items():
             self._set_hyper_parameter(name, value)

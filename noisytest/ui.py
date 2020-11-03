@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import os
+import logging
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -22,6 +23,9 @@ def _parse_arguments():
     parser.add_argument('--config', type=argparse.FileType('rt'),
                         help='noisytest config file name',
                         default='noisytest-config.json', required=False, metavar='NOISYTEST_CONFIG')
+
+    parser.add_argument("-v", "--verbosity", action="count",
+                        help="console output verbosity")
 
     parser.set_defaults(func=_test)
 
@@ -53,8 +57,8 @@ def _test(args):
     time_frames, failure_prediction = pipeline.test(args['noise_file'])
     for t, label in zip(time_frames, failure_prediction):
         if label > 0:
-            print("<!>:possible", pipeline.import_preprocessor.target_data_to_keywords[label],
-                  "in time region", t[0], "-", t[-1])
+            logging.warning(f"<!>:possible {pipeline.import_preprocessor.target_data_to_keywords[label]}"
+                            f"in time region{t[0]}-{t[-1]}")
 
 
 def _train(args):
@@ -69,15 +73,25 @@ def _train(args):
         pipeline.optimize(training_data, validation_data)
     else:
         error = pipeline.learn(training_data, validation_data)
-        print('Validation subset accuracy:', error.subset_accuracy,
-              ', per-class error (false negative, false positive):',
-              error.class_false_negatives, error.class_false_positives)
+        logging.info(f'Validation subset accuracy: {error.subset_accuracy}')
+        logging.info('Per-class error (false negative, false positive): '
+                     f'{error.class_false_negatives}, {error.class_false_positives}')
 
     pickle.dump(pipeline, args['output'])
 
 
+def _configure_logger(args):
+    if args['verbosity']:
+        level = max(logging.DEBUG, logging.CRITICAL + 10 - args['verbosity'] * 10)
+    else:
+        level = logging.INFO
+
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=level)
+
+
 def run():
     args = _parse_arguments()
+    _configure_logger(vars(args))
     args.func(vars(args))
 
 

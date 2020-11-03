@@ -64,19 +64,21 @@ class Preprocessor(HyperParameterMixin):
     def append_parent(self, new_parent):
         """Add a parent to the preprocessor chain"""
         obj = self
-        while True:
-            if obj.parent is None:
-                obj.parent = new_parent
-                return self
 
+        while obj.parent:
             obj = obj.parent
+
+        obj.parent = new_parent
+        return self
 
     @property
     def arguments(self):
+        """Returns arguments supplied to this instance or its parents as dict"""
         return self._arguments
 
     @property
     def parent(self):
+        """Returns this instance's parent preprocessor"""
         return self._parent
 
     @parent.setter
@@ -147,7 +149,9 @@ class TimeDataFramer(ImportPreprocessor):
         result = super().prepare_input_target_data(data)
         result = self._pad_if_necessary(result)
 
-        assert self.keywords_to_target_data, "LabelData must be available"
+        if not self.keywords_to_target_data:
+            raise ValueError("preprocessor requires valid label keywords")
+
         result.input = self._frame_data(result.input)
         target_value = float(self.keywords_to_target_data[result.target])
         result.target = tf.fill([tf.shape(result.input)[0]], target_value)
@@ -261,8 +265,8 @@ class SpectrogramCompressor(InputOnlyPreprocessor):
     def _averaging_tensor(original_size, compression_rate):
         """A tensor to compress the last dimension of tensor data by compression_rate"""
         if original_size % compression_rate > 0:
-            print('originalSize:', original_size, 'compressionRate:', compression_rate)
-            raise ValueError('original size must be a multiple of the compression rate!')
+            raise ValueError(f"original size ({original_size}) "
+                             f"must be a multiple of the compression rate ({compression_rate})!")
 
         averaging_block_line = tf.fill([1, int(compression_rate)], 1.0)
         padded = tf.pad(averaging_block_line, tf.constant([[0, 0], [0, int(original_size)]]))

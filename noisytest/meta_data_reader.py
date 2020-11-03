@@ -15,12 +15,6 @@ class MetaData:
 class MetaDataReader:
     """TOML-based reader for training/validation data annotations"""
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
     def __init__(self, filename: str):
         """Construct a meta data reader from given filename
 
@@ -31,8 +25,11 @@ class MetaDataReader:
 
         self._reader = toml.load(filename)
 
-        assert len(self._reader['data']['chunk_ranges']) == len(self._reader['data']['chunk_labels']), \
-            "%r: Number of chunk ranges must match the number of chunk labels" % filename
+        number_of_chunks = len(self._reader['data']['chunk_ranges'])
+        number_of_labels = len(self._reader['data']['chunk_labels'])
+
+        if number_of_chunks != number_of_labels:
+            raise ValueError(f"{filename}: Number of chunk ranges must match the number of chunk labels")
 
     @staticmethod
     def file_extension():
