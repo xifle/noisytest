@@ -3,3 +3,6 @@ __pycache__
 data
 default.noisy
 .idea
+build
+dist
+noisytest_xifle.egg-info

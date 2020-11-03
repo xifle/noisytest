@@ -1,9 +1,9 @@
 import logging
 import os
 
-import noisytest.noise_reader
-import noisytest.meta_data_reader
-import noisytest.preprocessor
+from noisytest.reader.noise import NoiseReader
+from noisytest.reader.meta_data import MetaDataReader
+from noisytest.preprocessor import InputTargetData
 
 
 class ExperimentReader:
@@ -32,8 +32,8 @@ class ExperimentReader:
         """Reads in an experiment consisting of noise data and labels"""
 
         full_filename = os.path.join(data_path, experiment_name)
-        meta_reader = noisytest.MetaDataReader(full_filename)
-        noise_reader = noisytest.NoiseReader(full_filename)
+        meta_reader = MetaDataReader(full_filename)
+        noise_reader = NoiseReader(full_filename)
 
         if not self._preprocessor.is_matching_sample_time(noise_reader.sample_time):
             raise ValueError(f"{full_filename}: Sample time does not match preprocessor specs")
@@ -50,7 +50,7 @@ class ExperimentReader:
             logging.debug(f"{filename}: Aggregating block from t={start_time} to t={end_time}")
 
             noise = noise_data.noise_estimate[(noise_data.time >= start_time) & (noise_data.time <= end_time)]
-            inout_data = noisytest.InputTargetData(noise, label, noise.size, 1)
+            inout_data = InputTargetData(noise, label, noise.size, 1)
 
             processed = self._preprocessor.prepare_input_target_data(inout_data)
             result = self._preprocessor.concat_input_target_data(result, processed)

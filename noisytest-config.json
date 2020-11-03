@@ -2,10 +2,6 @@
   "import_preprocessor": {
     "arguments": {
       "keywords_to_target_data": {
-        "ok": 0,
-        "impact": 1,
-        "highaccelerations": 2,
-        "oscillations": 3
       }
     }
   },

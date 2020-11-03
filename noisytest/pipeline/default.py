@@ -1,40 +1,11 @@
-from abc import ABC, abstractmethod
 import json
 
-import noisytest.model
-import noisytest.optimizer
-import noisytest.preprocessor
-
-
-class Pipeline(ABC):
-
-    @abstractmethod
-    def create_import_preprocessor(self, **kwargs):
-        pass
-
-    @abstractmethod
-    def create_feature_preprocessor(self, **kwargs):
-        pass
-
-    @abstractmethod
-    def create_model(self, **kwargs):
-        pass
-
-    @abstractmethod
-    def load_training_data(self, training_data_directory, validation_data_directory):
-        pass
-
-    @abstractmethod
-    def test(self, test_file: str):
-        pass
-
-    @abstractmethod
-    def learn(self, training_data, validation_data):
-        pass
-
-    @abstractmethod
-    def optimize(self, training_data, validation_data):
-        pass
+from noisytest.model import Model
+from noisytest.optimizer import Optimizer
+from noisytest.reader import NoiseReader, DataSetReader
+from noisytest.preprocessor import Mag2Log, Spectrogram, SpectrogramCompressor, Flatten, TimeDataFramer, \
+    DiscreteCosineTransform
+from noisytest.pipeline.base import Pipeline
 
 
 class DefaultPipeline(Pipeline):
@@ -65,35 +36,35 @@ class DefaultPipeline(Pipeline):
 
     def optimize(self, training_data, validation_data):
         """Run hyper-parameter search on this pipeline's parameters"""
-        opt = noisytest.Optimizer(training_data, validation_data, self)
+        opt = Optimizer(training_data, validation_data, self)
         opt.grid_search()
 
     def create_import_preprocessor(self, **kwargs):
         """Factory method for import preprocessor chain"""
-        return noisytest.TimeDataFramer(**kwargs)
+        return TimeDataFramer(**kwargs)
 
     def create_feature_preprocessor(self, **kwargs):
         """Factory method for feature preprocessor chain"""
 
         # creates the chain of preprocessors used for the default feature processing
         # execution order is inner first.
-        return noisytest.Flatten(noisytest.DiscreteCosineTransform(
-            noisytest.Mag2Log(noisytest.SpectrogramCompressor(noisytest.Spectrogram(**kwargs)))))
+        return Flatten(DiscreteCosineTransform(
+            Mag2Log(SpectrogramCompressor(Spectrogram(**kwargs)))))
 
     def create_model(self, **kwargs):
         """Factory method for noisytest model"""
-        return noisytest.Model(**kwargs)
+        return Model(**kwargs)
 
     def load_prediction_data(self, filename: str):
         """Load noise data from given file"""
-        return noisytest.NoiseReader(filename, self._import_preprocessor).data()
+        return NoiseReader(filename, self._import_preprocessor).data()
 
     def load_training_data(self, training_data_directory, validation_data_directory):
         """Loads data from specified directory using the import preprocessor
 
         Returns a tuple (training_data, validation_data)
         """
-        reader = noisytest.DataSetReader(self._import_preprocessor)
+        reader = DataSetReader(self._import_preprocessor)
         training_data = reader.read_data_set(training_data_directory)
 
         # Validation data must not be padded to avoid learning the symmetry / properties of padded
