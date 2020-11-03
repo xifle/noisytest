@@ -4,12 +4,12 @@ import os
 import logging
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-import noisytest
+from noisytest.pipeline import DefaultPipeline
+from noisytest import __version__
 
 
 def _parse_arguments():
-    parser = argparse.ArgumentParser(description='This is NoisyTest ' + noisytest.__version__,
+    parser = argparse.ArgumentParser(description='This is NoisyTest ' + __version__,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--pipeline', type=argparse.FileType('rb'),
@@ -57,15 +57,15 @@ def _test(args):
     time_frames, failure_prediction = pipeline.test(args['noise_file'])
     for t, label in zip(time_frames, failure_prediction):
         if label > 0:
-            logging.warning(f"<!>:possible {pipeline.import_preprocessor.target_data_to_keywords[label]}"
-                            f"in time region{t[0]}-{t[-1]}")
+            logging.warning(f"possible {pipeline.import_preprocessor.target_data_to_keywords[label]}"
+                            f" in time region {t[0]:.2}-{t[-1]:.2}")
 
 
 def _train(args):
     if args['load_parameters']:
         pipeline = pickle.load(args['pipeline'])
     else:
-        pipeline = noisytest.DefaultPipeline(args['config'])
+        pipeline = DefaultPipeline(args['config'])
 
     training_data, validation_data = pipeline.load_training_data(args['training_data'], args['validation_data'])
 

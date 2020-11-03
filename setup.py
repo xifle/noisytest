@@ -20,6 +20,12 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    install_requires=[
+        'dataclasses>=0.7',
+        'tensorflow>=2,<3',
+        'toml>=0.10',
+        'scikit-learn>=0.22',
+    ],
     python_requires='>=3.6',
     entry_points={
         'console_scripts': ['noisytest=noisytest.ui:run'],
