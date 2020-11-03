@@ -5,10 +5,9 @@ a simulation environment or experiments to detect software flaws. The main objec
 of virtual system tests to reduce the time required for real-world experiments. Especially in the robotics domain, 
 real-world experiments are rather costly and too many flaws remain undetected in simulation.
 
-NoisyTest is used for virtual system testing of the humanoid robot @am-lola. For more info refer to the 
-[project page](https://www.mw.tum.de/en/am/research/current-projects/robotics/humanoid-robot-lola/).
+NoisyTest is used for virtual system testing of the humanoid robot [Lola](https://www.mw.tum.de/en/am/research/current-projects/robotics/humanoid-robot-lola/).
 In general, the tool may be used on any noise data to detect and characterize failures. 
-Feel free to use NoisyTest for your purposes -- let me know when you find it useful.
+Feel free to use NoisyTest for your purposes and let me know when you find it useful.
 
 ## Install
 
