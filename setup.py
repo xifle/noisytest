@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="noisytest-xifle",
+    name="noisytest",
     version=__version__,
     author="Felix Sygulla",
     author_email="felix.sygulla@tum.de",
