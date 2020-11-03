@@ -1,7 +1,7 @@
 # NoisyTest
 
 NoisyTest is a command-line tool for noise-based system tests of (robotic) systems. It uses scalar noise (vibration) data from
-a simulation environment or experiments to detect software flaws. The main objective behind this tool is the improvement
+a simulation environment or experiments to detect software flaws via machine learning. The main objective behind this tool is the improvement
 of virtual system tests to reduce the time required for real-world experiments. Especially in the robotics domain, 
 real-world experiments are rather costly and too many flaws remain undetected in simulation.
 
