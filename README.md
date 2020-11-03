@@ -78,7 +78,7 @@ to mark individual time-frames.
 ## Disclaimer & Contributing
 
 This project started as a mere proof of concept.  Although it already reached a state which can in general be used 
-productively, it currently lacks some features --- and more important --- a solid test base. This will be fixed as soon
+productively, it currently lacks some features - and more important - a solid test base. This will be fixed as soon
 as I find time. In the meantime be warned of possible errors ;)
 
 Feel free to contribute to this project.
