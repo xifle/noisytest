@@ -48,6 +48,7 @@ To train a model, we first need some noise-based training / validation data set.
 
 ```bash
 $ git clone https://github.com/am-lola/noisytest-data-lola.git data
+$ git lfs pull
 ```
 
 We may then use noisytest to train a model:
